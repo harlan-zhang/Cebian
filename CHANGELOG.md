@@ -18,6 +18,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 变更 / Changed
+
+- 优化 VFS 大文件下载：字节到 Blob 的转换改为异步处理，下载较长的 JS 文件时不会长时间阻塞浏览器界面
+
+- Improved VFS downloads for large files by converting bytes to a Blob asynchronously, so downloading a long JavaScript file no longer blocks the browser UI for an extended period
+
 ## 1.7.1 - 2026-09-15
 
 ### 新增 / Added

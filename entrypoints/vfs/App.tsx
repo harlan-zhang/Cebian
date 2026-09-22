@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { vfs } from '@/lib/persistence/vfs';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import { themePreference } from '@/lib/persistence/storage';
-import { downloadFile } from '@/lib/utils';
+import { downloadBytes } from '@/lib/utils';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/sonner';
 import { Spinner } from '@/components/ui/spinner';
@@ -122,13 +122,12 @@ export default function App() {
       if (snapshot.kind === 'file') {
         const data = (await vfs.readFile(snapshot.path)) as unknown as Uint8Array;
         const name = snapshot.path.split('/').pop() || 'file';
-        // 包成 Blob——`downloadFile` 接受 ArrayBuffer/Blob/string 而不直接接受 Uint8Array。
-        // `as BlobPart` 见 load-view.ts 同处注释。通用 octet-stream 防止浏览器改写扩展名
-        // （如 .md → .txt）。
-        downloadFile(name, new Blob([data as BlobPart], { type: 'application/octet-stream' }), 'application/octet-stream');
+        // 走异步字节下载，避免大文件在 UI 线程同步构造 Blob 时冻结页面。
+        // 通用 octet-stream 防止浏览器改写扩展名（如 .md → .txt）。
+        await downloadBytes(name, data, 'application/octet-stream');
       } else {
         const data = await zipDirectory(snapshot.path);
-        downloadFile(zipNameFor(snapshot.path), new Blob([data as BlobPart], { type: 'application/zip' }), 'application/zip');
+        await downloadBytes(zipNameFor(snapshot.path), data, 'application/zip');
       }
     } catch (err) {
       console.error('[vfs.download]', err);

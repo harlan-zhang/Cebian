@@ -77,6 +77,15 @@ export function downloadFile(name: string, content: string | Blob | ArrayBuffer,
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+/** Download bytes without constructing a Blob synchronously on the UI thread.
+ * Response.blob() consumes the byte body asynchronously, which avoids the
+ * long main-thread pause that `new Blob([largeUint8Array])` causes for large
+ * VFS files. */
+export async function downloadBytes(name: string, content: Uint8Array, mimeType: string): Promise<void> {
+  const blob = await new Response(content as unknown as BodyInit, { headers: { 'Content-Type': mimeType } }).blob();
+  downloadFile(name, blob, mimeType);
+}
+
 /** Escape `&` and `<` (and `"` when `forAttribute: true`) for safe inclusion
  *  in XML. Use the default for element text content; pass `{forAttribute:true}`
  *  for attribute values.
