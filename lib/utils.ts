@@ -77,13 +77,43 @@ export function downloadFile(name: string, content: string | Blob | ArrayBuffer,
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/** Download bytes without constructing a Blob synchronously on the UI thread.
- * Response.blob() consumes the byte body asynchronously, which avoids the
- * long main-thread pause that `new Blob([largeUint8Array])` causes for large
- * VFS files. */
+/** Download bytes without constructing a large Blob on the UI thread.
+ * The worker receives the backing ArrayBuffer by transfer, constructs the Blob
+ * off the page thread, and returns the immutable Blob without copying it back.
+ * A Response fallback keeps the helper usable if workers are unavailable. */
 export async function downloadBytes(name: string, content: Uint8Array, mimeType: string): Promise<void> {
-  const blob = await new Response(content as unknown as BodyInit, { headers: { 'Content-Type': mimeType } }).blob();
+  let blob: Blob;
+  if (typeof Worker === 'function' && content.buffer instanceof ArrayBuffer) {
+    blob = await blobFromBytesWorker(content, mimeType);
+  } else {
+    blob = await new Response(content as unknown as BodyInit, { headers: { 'Content-Type': mimeType } }).blob();
+  }
   downloadFile(name, blob, mimeType);
+}
+
+function blobFromBytesWorker(content: Uint8Array, mimeType: string): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(browser.runtime.getURL('/download-worker.js' as never));
+    const finish = () => worker.terminate();
+    worker.onmessage = (event: MessageEvent<{ blob?: Blob; error?: string }>) => {
+      finish();
+      if (event.data.blob) resolve(event.data.blob);
+      else reject(new Error(event.data.error ?? 'Failed to create download Blob'));
+    };
+    worker.onerror = (event) => {
+      finish();
+      reject(new Error(event.message || 'Download worker failed'));
+    };
+    worker.postMessage(
+      {
+        buffer: content.buffer,
+        byteOffset: content.byteOffset,
+        byteLength: content.byteLength,
+        mimeType,
+      },
+      [content.buffer],
+    );
+  });
 }
 
 /** Escape `&` and `<` (and `"` when `forAttribute: true`) for safe inclusion
