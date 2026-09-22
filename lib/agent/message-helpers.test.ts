@@ -346,3 +346,14 @@ describe('replaceUserText — 块数组形态定位末尾请求块', () => {
     expect(blocks[1].text).toBe('<user-request>\n新请求\n</user-request>');
   });
 });
+
+describe('sanitizeAgentMessages · 深度', () => {
+  it('保持浅层：嵌套在 details 里的 undefined 不在热路径上处理（落树边界另行 omitUndefinedDeep）', () => {
+    const toolResult = {
+      role: 'toolResult', toolCallId: 't', toolName: 'demo', content: [],
+      details: { structured: undefined }, isError: false, timestamp: 1,
+    };
+    const [out] = sanitizeAgentMessages(asMessages([toolResult]));
+    expect(Object.hasOwn((out as any).details, 'structured')).toBe(true);
+  });
+});
