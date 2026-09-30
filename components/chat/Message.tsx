@@ -1,4 +1,4 @@
-import { Bot, ChevronLeft, ChevronRight, Lightbulb, CheckCircle, Crosshair, FileText, Film, FoldVertical, Pencil, ShieldAlert } from 'lucide-react';
+import { Bot, ChevronLeft, ChevronRight, Lightbulb, CheckCircle, Crosshair, FileText, Film, FoldVertical, Pencil, Scissors, ShieldAlert } from 'lucide-react';
 import { useState, useEffect, useRef, useMemo, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -127,7 +127,7 @@ export function UserMessageBubble({
             }}
             aria-label={t('common.edit')}
             rows={Math.min(8, Math.max(2, draft.split('\n').length))}
-            className="w-full resize-y bg-transparent text-[0.9rem] leading-relaxed outline-none px-2 py-1"
+            className="w-full resize-y bg-transparent chat-text-body chat-font leading-relaxed outline-none px-2 py-1"
           />
           <div className="flex items-center justify-end gap-2 px-1">
             <span className="text-[0.7rem] text-muted-foreground mr-auto">
@@ -157,7 +157,7 @@ export function UserMessageBubble({
   return (
     <div className="self-end max-w-[95%] group/user">
       {hasBubble && (
-        <div className="bg-card border border-border px-4 py-3 rounded-2xl text-[0.9rem] leading-relaxed w-fit ml-auto whitespace-pre-wrap break-all">
+        <div className="bg-card border border-border px-4 py-3 rounded-2xl chat-text-body chat-font leading-relaxed w-fit ml-auto whitespace-pre-wrap break-all">
           {bubble}
         </div>
       )}
@@ -259,14 +259,20 @@ export function UserMessageBubble({
 /** 历史压缩分割条：标记此处之前的上下文已被折叠成摘要——发送给模型时只保留
  *  摘要，但原始消息仍完整留在消息流里供用户向上翻阅。静态、不可折叠。
  *  注：压缩前 token 估算已暂时隐藏（仍存于 compactionSummary.tokensBefore），
- *  将来可能恢复展示。 */
-export function CompactionDivider() {
+ *  将来可能恢复展示。
+ *
+ *  `dropped`：摘要没能生成、早期历史被直接丢弃的兜底（见 createDroppedHistoryMessage）。
+ *  这跟压缩不是一回事——模型那边什么都没留下——所以文案与图标都要区分开，否则用户会
+ *  以为早期内容还在摘要里。 */
+export function CompactionDivider({ dropped }: { dropped?: boolean }) {
   return (
     <div className="flex items-center gap-2 my-1 select-none" role="separator">
       <div className="h-px flex-1 bg-border" />
       <span className="flex items-center gap-1.5 text-[0.7rem] text-muted-foreground/70 font-medium whitespace-nowrap">
-        <FoldVertical className="size-3 shrink-0" />
-        {t('chat.compaction.divider')}
+        {dropped
+          ? <Scissors className="size-3 shrink-0" />
+          : <FoldVertical className="size-3 shrink-0" />}
+        {t(dropped ? 'chat.compaction.droppedDivider' : 'chat.compaction.divider')}
       </span>
       <div className="h-px flex-1 bg-border" />
     </div>
@@ -396,7 +402,7 @@ export function AgentTextBlock({ content, streaming }: { content: string; stream
   // data-speech-content：标记「可朗读的回复正文」，供 extractSpeakText 只读此子树，
   // 从而跳过 thinking / 工具卡片 / 错误提示等同处一个容器下的其它块。
   return (
-    <div data-speech-content>
+    <div data-speech-content className="chat-text-body chat-font">
       <MarkdownRenderer content={content} normalizeMath streaming={streaming} />
     </div>
   );
@@ -435,7 +441,7 @@ export function ThinkingBlock({ content, isLive }: { content: string; isLive?: b
         }`}
       >
         <div className="overflow-hidden">
-          <div className="px-3 py-3 border-t border-dashed border-border text-muted-foreground font-mono text-[0.75rem] leading-relaxed bg-card/50">
+          <div className="px-3 py-3 border-t border-dashed border-border text-muted-foreground font-mono chat-text-small leading-relaxed bg-card/50">
             <MarkdownRenderer content={content} normalizeMath streaming={isLive} />
           </div>
         </div>

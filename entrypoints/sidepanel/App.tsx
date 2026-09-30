@@ -10,7 +10,10 @@ import { Header } from '@/components/layout/Header';
 import { HistoryPanel } from '@/components/layout/HistoryPanel';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import { useChangelogOnUpdate } from '@/hooks/useChangelogOnUpdate';
+import { useChatAppearance } from '@/hooks/useChatAppearance';
+import { useFileDropGuard } from '@/hooks/useFileDropZone';
 import { themePreference } from '@/lib/persistence/storage';
+import { chatAppearanceStyle } from '@/lib/ui/chat-appearance';
 import { sessionListChannel } from '@/lib/agent/session-list-channel';
 import { t } from '@/lib/i18n';
 import { ChatPage } from './pages/chat';
@@ -38,6 +41,8 @@ function applyTheme(resolved: 'dark' | 'light') {
 function App() {
   const [theme, setTheme] = useStorageItem(themePreference, 'system');
   const [themeReady, setThemeReady] = useState(false);
+  // 对话区字号 / 字体：与主题一样先读出再渲染，避免首帧按默认字号画完再跳变
+  const appearance = useChatAppearance();
   const [historyOpen, setHistoryOpen] = useState(false);
   const [chatTitle, setChatTitle] = useState('');
 
@@ -65,6 +70,9 @@ function App() {
 
   // 侧边栏打开后，若后台在升级时留了「待展示更新日志」标记，则打开更新日志页。
   useChangelogOnUpdate();
+
+  // 文件拖放兜底：拖放区以外松开文件不让浏览器打开它；同时给内部拖动打标记（见 hook）。
+  useFileDropGuard();
 
   // Load theme from storage before first render
   useEffect(() => {
@@ -136,11 +144,11 @@ function App() {
     navigate(lastChatPathRef.current, { replace: true });
   }, [navigate]);
 
-  if (!themeReady) return null;
+  if (!themeReady || !appearance) return null;
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="flex flex-col h-screen overflow-hidden relative">
+      <div className="flex flex-col h-screen overflow-hidden relative" style={chatAppearanceStyle(appearance)}>
         {!location.pathname.startsWith('/settings') && (
           <Header
             title={chatTitle}

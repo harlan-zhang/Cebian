@@ -138,6 +138,7 @@ settings:
     providers: "AI 供應商"
     mcp: "MCP 伺服器"
     chat: "對話"
+    appearance: "外觀"
     prompts: "提示詞"
     skills: "技能"
     memory: "記憶"
@@ -239,6 +240,34 @@ settings:
       label: "工具列模型"
       hint: "劃詞工具列使用的模型。通常選擇速度快、成本低的模型即可，預設與對話模型相同。"
       followMain: "與對話模型相同"
+  appearance:
+    title: "外觀"
+    theme:
+      label: "主題"
+      system: "跟隨系統"
+      light: "淺色"
+      dark: "深色"
+    fontScale:
+      label: "對話字型大小"
+      hint: "縮放對話中的訊息與輸入框，工具卡片等其他介面維持原樣。"
+      # $1 = 縮放百分比
+      value: "$1%"
+    font:
+      label: "對話字型"
+      default: "預設"
+      serif: "襯線"
+      mono: "等寬"
+      custom: "自訂"
+      customHint: "從這台裝置已安裝的字型中選擇。第一次使用時會開啟一個分頁，要求讀取本機字型的權限。"
+      needPermission: "需要讀取本機字型的權限——請在剛開啟的分頁裡授權，然後再點開字型清單。"
+      pickerPlaceholder: "選擇字型…"
+      searchPlaceholder: "搜尋字型…"
+      loading: "正在讀取本機字型…"
+      notFound: "找不到字型"
+    preview:
+      label: "預覽"
+      question: "怎麼讓對話文字更容易閱讀？"
+      answer: "調整上方的字型大小與字型，變更會立即套用到所有對話。"
   chat:
     title: "對話"
     instructions:
@@ -246,9 +275,18 @@ settings:
       hint: "追加在預設規則之後，用於調整回覆語言、風格或角色。無法覆蓋工具協定與安全規則。"
       placeholder: "例如：\n- 用中文回覆\n- 回答盡量簡潔\n- 討論程式碼時預設使用 TypeScript"
     compaction:
-      label: "上下文壓縮模型"
-      hint: "對話過長時用來自動壓縮歷史的模型，預設與對話模型相同。"
-      followMain: "與對話模型相同"
+      auto:
+        label: "自動壓縮超長對話"
+        hint: "上下文接近模型上限時，把較早的歷史壓成摘要，讓長對話能繼續，而不是直接報錯中斷。"
+      threshold:
+        label: "壓縮閾值"
+        hint: "上下文估算佔模型上下文視窗達到該比例時觸發壓縮。"
+        # $1 = 閾值百分比
+        value: "$1%"
+      model:
+        label: "壓縮模型"
+        hint: "用來把較早歷史壓成摘要的模型，預設與對話模型相同。"
+        followMain: "與對話模型相同"
     autoTitle:
       label: "自動產生對話標題"
       hint: "首輪回覆結束後，用 AI 產生的簡短標題取代預設標題（首則訊息截斷）。"
@@ -573,14 +611,18 @@ chat:
     screenshotFailed: "螢幕截圖失敗"
     # $1 = 附件上限個數
     maxAttachments: "最多新增 $1 個附件"
-    # $1 = 實際新增的檔案數
-    truncatedFiles: "僅新增前 $1 個檔案，已達上限"
+    # $1 = 未新增的檔案數
+    skippedAtLimit:
+      1: "已達附件上限，1 個檔案未新增"
+      n: "已達附件上限，$1 個檔案未新增"
     # $1 = 檔案名稱，$2 = 容量上限（已格式化，如「5 MB」）
     fileTooLarge: "$1 超過 $2 限制"
     # $1 = 檔案名稱
     readFileFailed: "讀取失敗：$1"
     # $1 = 檔案名稱
     unsupportedFileType: "不支援的檔案類型：$1"
+    # 把檔案拖到聊天頁上方時顯示的遮罩文字
+    dropFiles: "放開以新增附件"
     modelNoImage: "當前模型不支援多模態輸入"
     imageStripped: "已移除圖片附件——當前模型不支援多模態輸入"
     noPrompts: "尚無 Prompt，前往 AI 設定建立"
@@ -696,9 +738,21 @@ chat:
     nextBranch: "下一個版本"
     # 收尾 assistant 回覆上分叉按鈕的 tooltip / aria-label（issue #60）
     fork: "分叉"
+  contextUsage:
+    # 輸入框旁進度環的無障礙名稱 / 停留提示。$1 = 已用百分比
+    label: "上下文已用 $1%"
+    title: "上下文用量"
+    # $1 = 已用 token（已縮寫，如 42.3K），$2 = 模型上下文視窗
+    amount: "$1 / $2 Token"
+    # $1 = 設定裡的壓縮閾值百分比
+    threshold: "達到 $1% 時自動壓縮較早的歷史。"
+    compactionOff: "未開啟自動壓縮。"
+    estimateNote: "為估算值，實際計數取決於模型自己的分詞器。"
   compaction:
     # 歷史壓縮分割條上的標籤
     divider: "先前上下文已壓縮"
+    # 摘要沒產生出來、先前上下文被直接丟棄時的同款分隔條
+    droppedDivider: "先前上下文摘要失敗，已丟棄"
     # 壓縮 LLM 調用進行中的底部狀態條
     status: "正在壓縮上下文…"
   session:
@@ -710,6 +764,8 @@ chat:
     # 使用者中途點停後，在 assistant 氣泡裡顯示的提示。
     # 保持中性語氣——不是錯誤，只是沒跑完。
     cancelled: "已取消"
+    # 上下文已滿且再也壓縮不動時，AI 自行暫停的提示，順帶告訴使用者下一步能做什麼
+    contextLimitPaused: "已暫停：上下文已滿，剩下的內容無法再壓縮。請開啟新對話、從較早的回覆分叉，或改用上下文視窗更大的模型。"
     # 背景端口還沒連上時（通常發生在 SW 剛唤醒 / 斷線重連期間）點發送/重試會看到這條
     notConnected: "尚未連接到背景服務，請稍後再試"
     # 自動重連多次失敗後提示。語氣是「還在試」，不保證能連上
@@ -957,6 +1013,16 @@ permission:
     denied: "麥克風權限被拒絕了。"
     deniedHint: "要使用語音輸入，請在剛開啟的 Chrome 設定頁裡允許 Cebian 使用麥克風。"
     deviceError: "找不到麥克風，或無法存取。請檢查裝置後重試。"
+  localFonts:
+    title: "請求讀取本機字型"
+    description: "自訂對話字型需要讀取這台裝置已安裝的字型。點擊下面的按鈕，然後在瀏覽器彈窗中選擇「允許」。"
+    allow: "允許讀取字型"
+    requesting: "等待你的選擇…"
+    granted: "已取得本機字型權限，此分頁將自動關閉。"
+    dismissed: "請求被關閉了，可以重新嘗試。"
+    denied: "讀取本機字型的權限被拒絕了。"
+    deniedHint: "要自訂對話字型，請在剛開啟的 Chrome 設定頁裡允許 Cebian 使用本機字型。"
+    failed: "無法讀取本機字型，請重試。"
 
 # ─── 錯誤（toast、抛出的錯誤訊息）───
 errors:
@@ -968,6 +1034,13 @@ errors:
   modelUnavailable: "所選模型已無法使用，請重新選擇。"
   pageActionGone: "找不到該操作。"
   pageActionSaveFailed: "儲存失敗，請重試。"
+  compactionSettingsSaveFailed: "儲存上下文壓縮設定失敗，請重試。"
+  appearanceSaveFailed: "儲存外觀設定失敗，請重試。"
+  localFontsPermissionDenied: "讀取本機字型的權限被拒絕。請在 Chrome 設定裡允許 Cebian 使用本機字型，然後重試。"
+  localFontsLoadFailed: "無法讀取本機字型，請重試。"
+  openTabFailed: "無法開啟分頁，請重試。"
+  # $1 = 資料夾名稱
+  folderUnsupported: "不支援新增資料夾：$1"
   searchEngineGone: "找不到該搜尋引擎。"
   searchEngineSaveFailed: "儲存搜尋引擎設定失敗，請重試。"
   # $1 = 搜尋詞佔位符字面值（「{query}」）
