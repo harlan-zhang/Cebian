@@ -11,6 +11,7 @@ import { t } from '@/lib/i18n';
 import { applyTheme, resolveTheme } from './lib/theme';
 import { dualViewTypeOf, getHashPath, navigateTo, sessionUuidOf, workspaceUuidOf } from './lib/path-utils';
 import { zipDirectory, zipNameFor } from './lib/download';
+import { startDownloadDiagnostics } from './lib/download-diagnostics';
 import { buildCrumbs } from './lib/breadcrumb';
 import { loadView, releaseView } from './lib/load-view';
 import { Breadcrumbs } from './ui/Breadcrumbs';
@@ -117,23 +118,30 @@ export default function App() {
     const snapshot = view;
     if (snapshot.kind !== 'file' && snapshot.kind !== 'dir') return;
 
+    const diagnostics = startDownloadDiagnostics();
+    let outcome: 'dispatched' | 'failed' = 'failed';
     setIsDownloading(true);
     try {
+      diagnostics?.mark(snapshot.kind === 'file' ? 'read:start' : 'zip:start');
       if (snapshot.kind === 'file') {
         const data = (await vfs.readFile(snapshot.path)) as unknown as Uint8Array;
+        diagnostics?.mark('read:ready', data.byteLength);
         const name = snapshot.path.split('/').pop() || 'file';
         // 走异步字节下载，避免大文件在 UI 线程同步构造 Blob 时冻结页面。
         // 通用 octet-stream 防止浏览器改写扩展名（如 .md → .txt）。
-        await downloadBytes(name, data, 'application/octet-stream');
+        await downloadBytes(name, data, 'application/octet-stream', diagnostics?.mark);
       } else {
         const data = await zipDirectory(snapshot.path);
-        await downloadBytes(zipNameFor(snapshot.path), data, 'application/zip');
+        diagnostics?.mark('zip:ready', data.byteLength);
+        await downloadBytes(zipNameFor(snapshot.path), data, 'application/zip', diagnostics?.mark);
       }
+      outcome = 'dispatched';
     } catch (err) {
       console.error('[vfs.download]', err);
       toast.error(t('common.downloadFailed'));
     } finally {
       setIsDownloading(false);
+      diagnostics?.finish(outcome);
     }
   }
 

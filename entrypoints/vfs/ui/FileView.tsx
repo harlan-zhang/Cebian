@@ -1,4 +1,4 @@
-import { Suspense, lazy } from 'react';
+import { memo, Suspense, lazy } from 'react';
 import { Spinner } from '@/components/ui/spinner';
 import { t } from '@/lib/i18n';
 import { formatBytes } from '@/lib/utils';
@@ -17,7 +17,8 @@ const MarkdownView = lazy(() => import('./views/MarkdownView').then((m) => ({ de
 
 /** 文件正文的分发器：按 media 类型选视图。没有外框、没有自己的头——文件名在面包屑，
  *  元信息与操作在页头 Toolbar，正文直接落在主区域（主区域是唯一滚动容器）。 */
-function FileView({ path, media, mode }: { path: string; media: FileMedia; mode: ViewMode }) {
+// 下载忙碌状态不应重建已高亮的代码 DOM；路径、媒体或模式变化时仍正常更新。
+const FileView = memo(function FileView({ path, media, mode }: { path: string; media: FileMedia; mode: ViewMode }) {
   const name = path.split('/').pop() ?? path;
 
   switch (media.type) {
@@ -57,6 +58,6 @@ function FileView({ path, media, mode }: { path: string; media: FileMedia; mode:
       return _exhaustive;
     }
   }
-}
+});
 
 export { FileView };

@@ -65,14 +65,16 @@ export function randomId(length = 8, base: 16 | 36 = 36): string {
 /** Trigger a browser download of `content` as a file named `name` with the
  *  given `mimeType`. Works for strings (JSON, text), Blobs, and ArrayBuffers.
  *  The object URL is revoked after a short delay so the download can start. */
-export function downloadFile(name: string, content: string | Blob | ArrayBuffer, mimeType: string): void {
+export function downloadFile(name: string, content: string | Blob | ArrayBuffer, mimeType: string, onPhase?: (phase: string) => void): void {
   const blob = content instanceof Blob ? content : new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = name;
   document.body.appendChild(a);
+  onPhase?.('anchor-click:start');
   a.click();
+  onPhase?.('anchor-click:end');
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
@@ -81,14 +83,16 @@ export function downloadFile(name: string, content: string | Blob | ArrayBuffer,
  * The worker receives the backing ArrayBuffer by transfer, constructs the Blob
  * off the page thread, and returns the immutable Blob without copying it back.
  * A Response fallback keeps the helper usable if workers are unavailable. */
-export async function downloadBytes(name: string, content: Uint8Array, mimeType: string): Promise<void> {
+export async function downloadBytes(name: string, content: Uint8Array, mimeType: string, onPhase?: (phase: string) => void): Promise<void> {
+  onPhase?.('blob:start');
   let blob: Blob;
   if (typeof Worker === 'function' && content.buffer instanceof ArrayBuffer) {
     blob = await blobFromBytesWorker(content, mimeType);
   } else {
     blob = await new Response(content as unknown as BodyInit, { headers: { 'Content-Type': mimeType } }).blob();
   }
-  downloadFile(name, blob, mimeType);
+  onPhase?.('blob:ready');
+  downloadFile(name, blob, mimeType, onPhase);
 }
 
 function blobFromBytesWorker(content: Uint8Array, mimeType: string): Promise<Blob> {

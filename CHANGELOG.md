@@ -20,9 +20,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### 变更 / Changed
 
-- 优化 VFS 大文件下载：把字节到 Blob 的转换移到独立 Worker，下载较长的 JS 文件时不会长时间阻塞浏览器界面
+- 优化 VFS 下载：字节到 Blob 的转换移到独立 Worker；下载状态切换不再重建已打开文件的高亮代码 DOM，减少长文件下载时的页面处理开销
 
-- Improved VFS downloads for large files by moving byte-to-Blob conversion into a dedicated Worker, so downloading a long JavaScript file no longer blocks the browser UI for an extended period
+- Reduced VFS download processing overhead by moving byte-to-Blob conversion into a dedicated Worker and keeping the open file's highlighted code DOM intact during download state changes
 
 ## 1.7.1 - 2026-09-15
 
