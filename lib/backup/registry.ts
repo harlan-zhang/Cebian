@@ -36,6 +36,8 @@ import {
   mobileEmulatedTabs,
   recorderOptions,
   pendingSidePanelHandoff,
+  syncConfig,
+  syncState,
   type MCPServerConfig,
   type ProviderCredentials,
   type WebDavConfig,
@@ -383,6 +385,11 @@ export const BACKUP_REGISTRY: BackupEntry<any>[] = [
   entry({ item: lastSettingsSection, storageClass: 'exclude' }),
   entry({ item: updateNoticeState, storageClass: 'exclude' }),
   entry({ item: pendingChangelogVersion, storageClass: 'exclude' }),
+  // 多设备同步的配置与运行态。配置含 WebDAV 账号密码与端到端加密口令——把它写进
+  // 备份等于让备份包携带「同步仓库的钥匙」，而且新设备恢复后会用同一份配置去连同一个
+  // 仓库，容易在未预期的情况下立刻开始同步。故本机连接信息一律不进备份。
+  entry({ item: syncConfig, storageClass: 'exclude' }),
+  entry({ item: syncState, storageClass: 'exclude' }),
 ];
 
 /** BACKUP_REGISTRY 中所有已登记的 storage key 集合（供覆盖性测试比对）。 */

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Sun, Moon, SunMoon, Settings, SquarePen, History, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { InlineRenameInput } from '@/components/common/InlineRenameInput';
+import { SyncButton } from '@/components/layout/SyncButton';
 import { MAX_SESSION_TITLE_LENGTH } from '@/lib/agent/session-title';
 import {
   Tooltip,
@@ -17,13 +18,15 @@ interface HeaderProps {
   theme: 'dark' | 'light' | 'system';
   onToggleTheme: () => void;
   onOpenSettings: () => void;
+  /** 打开「设置 → 数据」：同步按钮在未配置时用它把用户直接送到配置处。 */
+  onOpenSyncSettings?: () => void;
   onNewChat: () => void;
   onOpenHistory: () => void;
   /** 提供时标题可点击进入行内改名（仅已有会话且标题非空时由 App 传入）。 */
   onRename?: (title: string) => void;
 }
 
-export function Header({ title, isNewChat, theme, onToggleTheme, onOpenSettings, onNewChat, onOpenHistory, onRename }: HeaderProps) {
+export function Header({ title, isNewChat, theme, onToggleTheme, onOpenSettings, onOpenSyncSettings, onNewChat, onOpenHistory, onRename }: HeaderProps) {
   const [renaming, setRenaming] = useState(false);
   // 编辑途中入口被收回（切到新会话 / 设置）：退出编辑态，别让输入框悬在一个不能改名的页面上。
   useEffect(() => {
@@ -95,6 +98,8 @@ export function Header({ title, isNewChat, theme, onToggleTheme, onOpenSettings,
           </TooltipTrigger>
           <TooltipContent>{t('common.toggleTheme')}</TooltipContent>
         </Tooltip>
+
+        <SyncButton onOpenSettings={onOpenSyncSettings ?? onOpenSettings} />
 
         <Tooltip>
           <TooltipTrigger asChild>

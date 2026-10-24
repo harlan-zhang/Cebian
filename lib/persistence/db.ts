@@ -375,8 +375,25 @@ export async function updateSessionPlacement(
   });
 }
 
-// ─── Backup restore (transactional) ───
+// ─── 删除（多设备同步的远端删除传播） ───
 
+/**
+ * 按 id 批量删除会话及其 mutation 日志，单事务。返回实际删掉的行数。
+ *
+ * 只做存储层的事：调用方（background 的同步引擎）必须先把这些会话从 sessionManager
+ * 里摘掉（`destroySession`），否则活会话的下一次树写会把行重新建出来。
+ */
+export async function deleteSessionsByIds(ids: string[]): Promise<number> {
+  if (ids.length === 0) return 0;
+  return db.transaction('rw', db.sessions, db.sessionMutations, async () => {
+    const existing = await db.sessions.where('id').anyOf(ids).count();
+    await db.sessions.bulkDelete(ids);
+    await db.sessionMutations.where('sessionId').anyOf(ids).delete();
+    return existing;
+  });
+}
+
+// ─── Backup restore (transactional) ───
 /**
  * 在单个 Dexie rw 事务内完成「读 existing → 决策 → (可选清空) → 批量写入 → 重建
  * mutation 日志」，保证恢复要么整体生效、要么整体回滚——避免「清空后写入失败」

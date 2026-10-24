@@ -9,6 +9,7 @@ import type { SearchEnginesConfig } from '@/lib/search/types';
 import { DEFAULT_RECORDER_OPTIONS } from '@/lib/recorder/constants';
 import type { RecorderOptions } from '@/lib/recorder/types';
 import type { LanguagePreference } from '@/lib/i18n/locales';
+import { emptySyncState, type SyncConfig, type SyncState } from '@/lib/sync/types';
 
 // ─── Provider credential types ───
 
@@ -622,4 +623,27 @@ export interface SidePanelHandoff {
 export const pendingSidePanelHandoff = storage.defineItem<SidePanelHandoff | null>(
   'local:pendingSidePanelHandoff',
   { fallback: null },
+);
+
+// ─── 多设备同步 ───
+
+/**
+ * 多设备同步配置。**属于本机连接信息 + 密钥**：既含 WebDAV 账号密码，也含端到端
+ * 加密口令。因此既不进备份、也不同步到远端（把同步口令传到它自己要保护的仓库里
+ * 毫无意义）。新设备需要重新配置一次。
+ */
+export const syncConfig = storage.defineItem<SyncConfig | null>(
+  'local:syncConfig',
+  { fallback: null },
+);
+
+/**
+ * 多设备同步的运行态：上次同步时间、错误、以及三方合并的基线。
+ *
+ * 基线（每个会话的远端 updatedAt、每个设置项的哈希）是合并正确性的前提，丢了这个
+ * 文件就只能退化成「谁新谁赢」的盲目覆盖。它只由 background 写，UI 只读。
+ */
+export const syncState = storage.defineItem<SyncState>(
+  'local:syncState',
+  { fallback: emptySyncState() },
 );

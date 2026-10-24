@@ -3,6 +3,7 @@ import { FolderOpen, Loader2 } from 'lucide-react';
 import { t } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
 import { BackupPanel } from '@/components/settings/backup/BackupPanel';
+import { SyncPanel } from '@/components/settings/sync/SyncPanel';
 import { vfs } from '@/lib/persistence/vfs';
 import { formatBytes } from '@/lib/utils';
 
@@ -38,6 +39,8 @@ export function DataSection() {
       <h2 className="text-base font-semibold">{t('settings.data.title')}</h2>
 
       <BackupPanel />
+
+      <SyncPanel />
 
       <div className="space-y-4">
         <h3 className="text-sm font-medium">{t('settings.data.storage.title')}</h3>

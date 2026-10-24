@@ -11,6 +11,7 @@ import { setupMobileEmulation } from './mobile-emulation';
 import { setupMcpOriginRules } from './mcp/origin-rules';
 import { seedDevStorage } from './providers/dev-seed';
 import { registerBackupHandler } from './chat/backup-handler';
+import { setupSync } from './sync/manager';
 import { setupPageActions } from '@/lib/page-actions/manager';
 import { runPageActionStream, materializeHandoff } from './page-actions/runner';
 import { SUPPRESS_KIND } from '@/lib/page-actions/types';
@@ -41,6 +42,9 @@ export default defineBackground(() => {
 
   // 注册备份 IPC 响应器（会话采集 / 写回；Dexie 唯一写者经此转发）。
   registerBackupHandler();
+
+  // 多设备同步：周期 alarm + 浏览器启动 + 扩展页手动 / 打开侧边栏触发。
+  setupSync();
 
   // 注册页面交互（悬浮球 / 划词工具条）的 runtime 消息处理器。
   setupPageActions({

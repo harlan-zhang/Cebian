@@ -9,6 +9,7 @@ import type { Session } from '@/lib/shims/pi-harness/session/session';
 import { SessionError } from '@/lib/shims/pi-harness/session/types';
 import {
   applySessionsTransactional,
+  deleteSessionsByIds,
   getSession,
   listSessions,
   retryTreeMigration,
@@ -249,6 +250,18 @@ class SessionStore {
     // 盘上日志已被事务重写：清空 repo 缓存，下次 open 重放新日志
     this.repo.evictAll();
     return result;
+  }
+
+  /**
+   * 按 id 批量删除会话（多设备同步把远端墓碑落到本机时用）。返回实际删掉的行数。
+   *
+   * 调用方必须先 `sessionManager.destroySession(id)` 摘掉活会话——本类不反向依赖
+   * session-manager（会成环），因此这一步留在同步引擎里。
+   */
+  async deleteMany(ids: string[]): Promise<number> {
+    const deleted = await deleteSessionsByIds(ids);
+    if (deleted > 0) this.repo.evictAll();
+    return deleted;
   }
 }
 
