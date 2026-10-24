@@ -18,6 +18,7 @@ import {
   customProviders,
   userInstructions,
   themePreference,
+  languagePreference,
   lastSelectedThinkingLevel,
   mcpServers,
   providerCredentials,
@@ -32,6 +33,8 @@ import {
   pageActionsConfig,
   searchEnginesConfig,
   floatingBallPosition,
+  mobileEmulatedTabs,
+  recorderOptions,
   pendingSidePanelHandoff,
   type MCPServerConfig,
   type ProviderCredentials,
@@ -298,7 +301,11 @@ export const BACKUP_REGISTRY: BackupEntry<any>[] = [
   }),
   entry({ item: userInstructions, storageClass: 'settings' }),
   entry({ item: themePreference, storageClass: 'settings' }),
+  entry({ item: languagePreference, storageClass: 'settings' }),
   entry({ item: lastSelectedThinkingLevel, storageClass: 'settings' }),
+  // 录制选项。Firefox 上的网络录制还依赖可选权限，权限不随备份走：恢复后首次开始录制时会
+  // 在点击里重新申请
+  entry({ item: recorderOptions, storageClass: 'settings' }),
   entry({
     item: mcpServers,
     storageClass: 'settings',
@@ -368,6 +375,8 @@ export const BACKUP_REGISTRY: BackupEntry<any>[] = [
   }),
   // 悬浮球位置（设备本地 UI 状态）。
   entry({ item: floatingBallPosition, storageClass: 'exclude' }),
+  // 手机模拟中的标签页（随调试连接存在的运行时状态）。
+  entry({ item: mobileEmulatedTabs, storageClass: 'exclude' }),
   // 「在侧边栏继续」的一次性交接标记（派生，备份无意义）。
   entry({ item: pendingSidePanelHandoff, storageClass: 'exclude' }),
   entry({ item: settingsFilePanelWidth, storageClass: 'exclude' }),

@@ -42,15 +42,23 @@ export default defineConfig({
       'bookmarks', 'history', 'cookies', 'topSites', 'sessions',
       'downloads', 'notifications',
       'clipboardRead',
+      // 去掉发往 MCP 服务器的 Origin 头（entrypoints/background/mcp/origin-rules.ts）。
+      // WithHostAccess 版本没有安装警告，复用已有的 <all_urls> 主机权限。
+      'declarativeNetRequestWithHostAccess',
     ],
     host_permissions: ['<all_urls>'],
+    // Firefox 没有调试器 API，录制网络请求用 webRequest；作为可选权限，用户在录制选项里开启
+    // 网络录制时才申请（Chrome 用调试器，不需要）
+    ...(browser === 'firefox' && { optional_permissions: ['webRequest'] }),
     action: {
       default_title: '__MSG_actionTitle__',
     },
     // 内容脚本注入的悬浮球 <img> 由页面渲染进程加载扩展资源，必须显式声明为
     // web_accessible_resources，否则 Chrome 会拦截、图标渲染不出。
+    // `_locales/*/messages.json`：用户手动选择界面语言时，内容脚本要 fetch 对应字典
+    // （lib/i18n），非 WAR 资源同样会被拦截。内容是公开文案，图标已可被探测，不增加暴露面。
     web_accessible_resources: [
-      { resources: ['icon/128.png'], matches: ['<all_urls>'] },
+      { resources: ['icon/128.png', '_locales/*/messages.json'], matches: ['<all_urls>'] },
     ],
     // Override the MV3 sandbox-page CSP. Chrome's default is restrictive
     // (`script-src 'self' 'unsafe-inline' 'unsafe-eval'; child-src 'self'`),
@@ -119,26 +127,6 @@ export default defineConfig({
     server: {
       // Sandbox pages have origin: null — allow CORS from any origin in dev mode
       cors: true,
-    },
-    // Inline the one Node-only `process.env.X` reference that
-    // `@earendil-works/pi-ai`'s OAuth modules read at module load time
-    // (openai-codex, anthropic). Without this, importing the oauth subpath
-    // in the browser/SW throws `ReferenceError: process is not defined` at
-    // module evaluation, killing background and sidepanel boot.
-    // Other `process.*` access in those modules is guarded by
-    // `typeof process !== "undefined"` or only runs inside Node-only code
-    // paths gated by `process.versions?.node`, and is safe to leave alone.
-    //
-    // The replaced value is never actually read at runtime — it sits inside
-    // a Node-only branch that is always skipped in the browser/SW. Cebian's
-    // own OAuth flows live in `lib/oauth.ts` and don't depend on it.
-    //
-    //   - PI_OAUTH_CALLBACK_HOST  : pi-ai openai-codex / anthropic — host
-    //                               for the local Node http.createServer
-    //                               that receives the OAuth callback in
-    //                               CLI mode.
-    define: {
-      'process.env.PI_OAUTH_CALLBACK_HOST': JSON.stringify('127.0.0.1'),
     },
     resolve: {
       alias: {
