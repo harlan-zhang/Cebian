@@ -54,7 +54,16 @@ export function setupSync(): void {
         sendResponse({
           ok: result.ok,
           ...(result.code ? { code: result.code } : {}),
+          ...(result.detail ? { detail: result.detail } : {}),
           ...(result.lastSyncAt !== undefined ? { lastSyncAt: result.lastSyncAt } : {}),
+        } satisfies SyncNowResponse);
+      },
+      // 兜底：任何逃逸的异常也要回包，否则页面侧拿到 undefined，只能报「同步失败」
+      (err: unknown) => {
+        sendResponse({
+          ok: false,
+          code: 'unknown',
+          detail: err instanceof Error ? `${err.name}: ${err.message}` : String(err),
         } satisfies SyncNowResponse);
       },
     );

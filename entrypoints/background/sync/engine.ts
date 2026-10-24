@@ -67,6 +67,8 @@ export type SyncReason = 'manual' | 'alarm' | 'startup' | 'panel';
 export interface SyncRunResult {
   ok: boolean;
   code?: SyncErrorCode;
+  /** 失败时的原始错误摘要，供 UI 展示 / 排障（不含凭据）。 */
+  detail?: string;
   stats?: SyncStats;
   lastSyncAt?: number;
 }
@@ -93,10 +95,41 @@ export async function runSync(reason: SyncReason, minIntervalMs = 0): Promise<Sy
       return { ok: true, lastSyncAt: state.lastSyncAt };
     }
   }
-  inFlight = execute(reason).finally(() => {
-    inFlight = null;
-  });
+  inFlight = execute(reason)
+    // execute 内部已兜底，这里再兜一层：runSync 永不 reject。一旦 reject，
+    // 消息监听器不会回包，UI 只能显示一句无从下手的「同步失败」。
+    .catch((err: unknown) => ({ ok: false, code: 'unknown' as const, detail: errorDetail(err) }))
+    .finally(() => {
+      inFlight = null;
+    });
   return inFlight;
+}
+
+/** 把远端索引归一化成完整形状。缺字段时补空，而不是让后续 Object.entries(undefined) 抛裸 TypeError。 */
+function normalizeIndex(raw: Partial<SyncIndex> | null): SyncIndex {
+  const obj = (v: unknown): Record<string, unknown> =>
+    v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+  return {
+    version: typeof raw?.version === 'number' ? raw.version : SYNC_SCHEMA_VERSION,
+    updatedAt: typeof raw?.updatedAt === 'number' ? raw.updatedAt : Date.now(),
+    devices: obj(raw?.devices) as SyncIndex['devices'],
+    sessions: obj(raw?.sessions) as SyncIndex['sessions'],
+    tombstones: obj(raw?.tombstones) as SyncIndex['tombstones'],
+  };
+}
+
+/** 同上，用于 settings / credentials blob。 */
+function normalizeBlob<T>(raw: Partial<SyncBlob<T>> | null): SyncBlob<T> {
+  const entries = raw?.entries;
+  return {
+    entries: entries && typeof entries === 'object' && !Array.isArray(entries) ? entries : {},
+  };
+}
+
+/** 取错误的可读摘要（截断，避免把超长栈信息塞进 storage / toast）。 */
+function errorDetail(err: unknown): string {
+  const text = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+  return text.length > 300 ? `${text.slice(0, 297)}...` : text;
 }
 
 /** 把未知异常翻译成同步错误码。 */
@@ -179,11 +212,15 @@ async function execute(reason: SyncReason): Promise<SyncRunResult> {
   const stats = emptySyncStats();
 
   acquireKeepAlive();
+  // 失败时把「卡在哪一步」写进 detail：只给一个 unknown 无法排障。
+  let phase = 'config';
   try {
+    phase = 'dirs';
     const remote = new SyncRemote(config);
     await remote.ensureDirectories();
 
     // ─ 1. 密钥 ─
+    phase = 'key';
     let meta = await remote.readMeta();
     if (!meta) {
       meta = createKeyMeta();
@@ -193,29 +230,32 @@ async function execute(reason: SyncReason): Promise<SyncRunResult> {
     const key = await deriveSyncKey(config.syncPassword, meta);
 
     // ─ 2. 读远端 ─
+    phase = 'read-remote';
     const indexBytes = await remote.readFile(SYNC_FILES.index);
     const remoteIndex: SyncIndex = indexBytes
-      ? await decryptJson<SyncIndex>(key, indexBytes)
+      ? normalizeIndex(await decryptJson<Partial<SyncIndex>>(key, indexBytes))
       : emptySyncIndex(startedAt);
     if (remoteIndex.version > SYNC_SCHEMA_VERSION) return { ok: false, code: 'incompatible' };
 
     const settingsBytes = await remote.readFile(SYNC_FILES.settings);
-    const remoteSettings: SyncBlob<unknown> = settingsBytes
-      ? await decryptJson<SyncBlob<unknown>>(key, settingsBytes)
-      : { entries: {} };
+    const remoteSettings: SyncBlob<unknown> = normalizeBlob<unknown>(
+      settingsBytes ? await decryptJson<Partial<SyncBlob<unknown>>>(key, settingsBytes) : null,
+    );
 
     const credsBytes = await remote.readFile(SYNC_FILES.credentials);
-    const remoteCreds: SyncBlob<ProviderCredential> = credsBytes
-      ? await decryptJson<SyncBlob<ProviderCredential>>(key, credsBytes)
-      : { entries: {} };
+    const remoteCreds: SyncBlob<ProviderCredential> = normalizeBlob<ProviderCredential>(
+      credsBytes ? await decryptJson<Partial<SyncBlob<ProviderCredential>>>(key, credsBytes) : null,
+    );
 
     // ─ 3. 采集本地 + 规划 ─
+    phase = 'collect-local';
     // 先把在途的树写落定，否则读到的会话可能是几毫秒前的旧状态。
     await sessionManager.flushAll();
     const localSessions = await listSessions();
     const localSettings = await collectLocalSettings();
     const localCreds = await providerCredentials.getValue();
 
+    phase = 'plan';
     const sessionPlan = planSessionSync({
       local: localSessions.map((s) => ({ id: s.id, updatedAt: s.updatedAt })),
       remote: remoteIndex.sessions,
@@ -249,16 +289,25 @@ async function execute(reason: SyncReason): Promise<SyncRunResult> {
     stats.conflicts = settingsPlan.conflicts.length + credPlan.conflicts.length;
 
     // ─ 4. 应用拉取与删除 ─
+    phase = 'pull-sessions';
     // 分批：首次同步可能一次拉上百个会话，全攒在内存里再写库会占掉几十 MB（会话里
     // 常有 base64 图片）。每批 20 个直接落库，内存峰值与总数无关。
     const PULL_BATCH = 20;
     let batch: SessionBackupRecord[] = [];
     const flushPulls = async (): Promise<void> => {
       if (batch.length === 0) return;
-      // merge 语义：只写比本地更新的，等于再兜一次 LWW 保护
-      await sessionStore.applyAll(batch, 'merge');
-      stats.pulledSessions += batch.length;
+      const current = batch;
       batch = [];
+      try {
+        // merge 语义：只写比本地更新的，等于再兜一次 LWW 保护
+        await sessionStore.applyAll(current, 'merge');
+        stats.pulledSessions += current.length;
+      } catch (err) {
+        // 单条会话数据坏掉不该让整次同步失败：记日志、跳过这一批，下次再试。
+        // 但传输 / 鉴权这类基础设施错误必须整体失败，否则会静默漏数据。
+        if (err instanceof SyncRemoteError) throw err;
+        console.warn(`[sync] failed to apply ${current.length} pulled session(s), skipped`, err);
+      }
     };
 
     for (const id of sessionPlan.pull) {
@@ -275,15 +324,18 @@ async function execute(reason: SyncReason): Promise<SyncRunResult> {
     }
     await flushPulls();
 
+    phase = 'delete-sessions';
     if (sessionPlan.deleteLocal.length > 0) {
       for (const id of sessionPlan.deleteLocal) sessionManager.destroySession(id);
       stats.deletedSessions = await sessionStore.deleteMany(sessionPlan.deleteLocal);
     }
 
+    phase = 'pull-settings';
     for (const [settingKey, value] of Object.entries(settingsPlan.pull)) {
       if (await writeLocalSetting(settingKey, value)) stats.pulledSettings++;
     }
 
+    phase = 'pull-credentials';
     if (Object.keys(credPlan.pull).length > 0) {
       const current = await providerCredentials.getValue();
       const next: ProviderCredentials = { ...current, ...credPlan.pull };
@@ -292,15 +344,23 @@ async function execute(reason: SyncReason): Promise<SyncRunResult> {
     }
 
     // ─ 5. 上传本地改动 ─
+    phase = 'push-sessions';
     const pushedSessionMeta: Record<string, { updatedAt: number }> = {};
     for (const id of sessionPlan.push) {
-      const record = await readSessionRecord(id);
-      if (!record) continue;
-      await remote.writeSession(id, await encryptJson(key, record));
-      pushedSessionMeta[id] = { updatedAt: record.updatedAt };
-      stats.pushedSessions++;
+      try {
+        const record = await readSessionRecord(id);
+        if (!record) continue;
+        await remote.writeSession(id, await encryptJson(key, record));
+        pushedSessionMeta[id] = { updatedAt: record.updatedAt };
+        stats.pushedSessions++;
+      } catch (err) {
+        // 同拉取：传输 / 鉴权问题整体失败，单条数据问题跳过
+        if (err instanceof SyncRemoteError) throw err;
+        console.warn(`[sync] failed to push session ${id}, skipped`, err);
+      }
     }
 
+    phase = 'push-settings';
     if (Object.keys(settingsPlan.push).length > 0) {
       // 写前重读远端，把「另一台设备刚写过」的窗口压到最小
       const fresh = await remote.readFile(SYNC_FILES.settings);
@@ -312,6 +372,7 @@ async function execute(reason: SyncReason): Promise<SyncRunResult> {
       stats.pushedSettings = Object.keys(settingsPlan.push).length;
     }
 
+    phase = 'push-credentials';
     if (Object.keys(credPlan.push).length > 0) {
       const fresh = await remote.readFile(SYNC_FILES.credentials);
       const current: SyncBlob<ProviderCredential> = fresh
@@ -323,6 +384,7 @@ async function execute(reason: SyncReason): Promise<SyncRunResult> {
     }
 
     // ─ 6. 写索引（最后一步） ─
+    phase = 'write-index';
     const freshIndexBytes = await remote.readFile(SYNC_FILES.index);
     const freshIndex: SyncIndex = freshIndexBytes
       ? await decryptJson<SyncIndex>(key, freshIndexBytes)
@@ -359,6 +421,7 @@ async function execute(reason: SyncReason): Promise<SyncRunResult> {
     }
 
     // ─ 7. 更新基线 ─
+    phase = 'update-state';
     // 设置 / 密钥的基线必须反映「同步后的本地值」：拉取后本地变了，推送后远端变了。
     const finalSettings = await collectLocalSettings();
     const finalSettingsHashes = await hashAll(finalSettings);
@@ -396,6 +459,7 @@ async function execute(reason: SyncReason): Promise<SyncRunResult> {
       lastSyncAt: startedAt,
       lastAttemptAt: startedAt,
       lastError: null,
+      lastErrorDetail: null,
       sessions: sessionsBaseline,
       settings: settingsBaseline,
       credentials: credBaseline,
@@ -411,13 +475,15 @@ async function execute(reason: SyncReason): Promise<SyncRunResult> {
     // 失败也记 lastAttemptAt，但保留上次成功的基线与 lastSyncAt——基线丢了会导致
     // 下次退化成盲目覆盖。
     const current = await syncState.getValue();
+    const detail = `${phase}: ${errorDetail(err)}`;
     await syncState.setValue({
       ...current,
       deviceId,
       lastAttemptAt: startedAt,
       lastError: code,
+      lastErrorDetail: detail,
     });
-    return { ok: false, code };
+    return { ok: false, code, detail };
   } finally {
     releaseKeepAlive();
   }

@@ -10,7 +10,7 @@ import { useStorageItem } from '@/hooks/useStorageItem';
 import { syncConfig, syncState } from '@/lib/persistence/storage';
 import { assertValidBaseUrl, testConnection, webdavErrorMessage } from '@/lib/backup/webdav';
 import { SYNC_NOW, type SyncNowResponse } from '@/lib/sync/protocol';
-import { syncErrorText, syncRelativeTime } from '@/lib/sync/messages';
+import { syncErrorText, syncErrorTextWithDetail, syncRelativeTime } from '@/lib/sync/messages';
 import {
   DEFAULT_SYNC_INTERVAL_MINUTES,
   SYNC_INTERVAL_OPTIONS,
@@ -95,11 +95,11 @@ export function SyncPanel() {
         reason: 'manual',
       })) as SyncNowResponse | undefined;
       if (!resp) {
-        toast.error(t('settings.sync.error.unknown'));
+        toast.error(syncErrorText('noResponse'));
         return;
       }
       if (resp.ok) toast.success(t('settings.sync.success'));
-      else toast.error(syncErrorText(resp.code ?? 'unknown'));
+      else toast.error(syncErrorTextWithDetail(resp.code ?? 'unknown', resp.detail));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : String(err));
     } finally {
@@ -150,6 +150,9 @@ export function SyncPanel() {
         </p>
       )}
       {lastError && <p className="text-xs text-destructive">{lastError}</p>}
+      {state.lastErrorDetail && (
+        <p className="text-xs text-muted-foreground break-all">{state.lastErrorDetail}</p>
+      )}
 
       <div className="space-y-1.5">
         <Label htmlFor="sync-url" className="text-xs">{t('settings.backup.webdav.urlLabel')}</Label>

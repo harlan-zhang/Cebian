@@ -18,6 +18,8 @@ export interface SyncNowRequest {
 export interface SyncNowResponse {
   ok: boolean;
   code?: SyncErrorCode;
+  /** 失败时的原始错误摘要（排障用，不含凭据）。 */
+  detail?: string;
   lastSyncAt?: number;
 }
 

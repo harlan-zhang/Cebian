@@ -26,9 +26,22 @@ export function syncErrorText(code: SyncErrorCode): string {
       return t('settings.sync.error.server');
     case 'busy':
       return t('settings.sync.error.busy');
+    case 'noResponse':
+      return t('settings.sync.error.noResponse');
     default:
       return t('settings.sync.error.unknown');
   }
+}
+
+/**
+ * 带原始错误摘要的文案。只在「无法归类」与「服务端异常」时附加：这两类光看错误码
+ * 无法定位，而 detail 往往直接点出原因（例如 Dexie 的约束冲突、某条会话解析失败）。
+ */
+export function syncErrorTextWithDetail(code: SyncErrorCode, detail?: string | null): string {
+  const base = syncErrorText(code);
+  if (!detail) return base;
+  if (code !== 'unknown' && code !== 'server' && code !== 'forbidden') return base;
+  return `${base} — ${detail}`;
 }
 
 /** 时间戳 → 「刚刚 / x 分钟前 / x 小时前 / x 天前」。 */

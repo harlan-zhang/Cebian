@@ -6,7 +6,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useStorageItem } from '@/hooks/useStorageItem';
 import { syncConfig, syncState } from '@/lib/persistence/storage';
 import { SYNC_NOW, type SyncNowResponse } from '@/lib/sync/protocol';
-import { syncErrorText, syncRelativeTime } from '@/lib/sync/messages';
+import { syncErrorText, syncErrorTextWithDetail, syncRelativeTime } from '@/lib/sync/messages';
 import { emptySyncState, type SyncConfig, type SyncErrorCode } from '@/lib/sync/types';
 import { cn } from '@/lib/utils';
 import { t } from '@/lib/i18n';
@@ -39,8 +39,9 @@ export function SyncButton({ onOpenSettings }: { onOpenSettings: () => void }) {
         type: SYNC_NOW,
         reason: 'manual',
       })) as SyncNowResponse | undefined;
-      if (resp?.ok) toast.success(t('settings.sync.success'));
-      else toast.error(syncErrorText(resp?.code ?? 'unknown'));
+      if (!resp) toast.error(syncErrorText('noResponse'));
+      else if (resp.ok) toast.success(t('settings.sync.success'));
+      else toast.error(syncErrorTextWithDetail(resp.code ?? 'unknown', resp.detail));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : String(err));
     } finally {
@@ -51,7 +52,7 @@ export function SyncButton({ onOpenSettings }: { onOpenSettings: () => void }) {
   const label = !configured
     ? t('settings.sync.notConfigured')
     : state.lastError
-      ? syncErrorText(state.lastError as SyncErrorCode)
+      ? syncErrorTextWithDetail(state.lastError as SyncErrorCode, state.lastErrorDetail)
       : state.lastSyncAt !== null
         ? t('settings.sync.lastSync', [syncRelativeTime(state.lastSyncAt)])
         : t('settings.sync.syncNow');

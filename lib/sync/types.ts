@@ -78,6 +78,8 @@ export interface SyncState {
   lastAttemptAt: number | null;
   /** 上次失败的本地化错误码（成功时清空）。 */
   lastError: string | null;
+  /** 上次失败的原始错误摘要（排障用；成功时清空）。 */
+  lastErrorDetail: string | null;
   /** 上次成功同步时，远端各会话的 updatedAt —— 三方合并的基线。 */
   sessions: Record<string, number>;
   /** 上次成功同步后，本地设置值的哈希 —— 用来判断「本地是否改过」。 */
@@ -154,6 +156,7 @@ export function emptySyncState(): SyncState {
     lastSyncAt: null,
     lastAttemptAt: null,
     lastError: null,
+    lastErrorDetail: null,
     sessions: {},
     settings: {},
     credentials: {},
@@ -186,4 +189,5 @@ export type SyncErrorCode =
   | 'forbidden'
   | 'server'
   | 'busy'
+  | 'noResponse'
   | 'unknown';

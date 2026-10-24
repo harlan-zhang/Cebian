@@ -631,6 +631,7 @@ settings:
       server: "The sync server returned an unexpected response"
       busy: "A sync is already running"
       unknown: "Sync failed"
+      noResponse: "Sync didn't finish — the background worker didn't respond. Try again; if it keeps happening, check the extension's service worker console"
 
   editor:
     selectFile: "Select a file to start editing"

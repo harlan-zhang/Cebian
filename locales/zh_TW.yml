@@ -626,6 +626,7 @@ settings:
       server: "同步伺服器傳回異常回應"
       busy: "已有同步正在進行"
       unknown: "同步失敗"
+      noResponse: "同步沒有完成——背景沒有回應。請再試一次；若反覆出現，請查看擴充功能的主控台"
 
   editor:
     selectFile: "選擇一個檔案開始編輯"
