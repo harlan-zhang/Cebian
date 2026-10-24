@@ -24,6 +24,7 @@ export type SyncRemoteErrorCode =
   | 'network'
   | 'timeout'
   | 'unauthorized'
+  | 'forbidden'
   | 'notFound'
   | 'conflict'
   | 'invalid'
@@ -157,8 +158,13 @@ async function request(url: string, config: SyncRemoteConfig, init: RequestOptio
 
 function mapStatus(status: number, method: string, url: string): SyncRemoteError {
   const where = `${method} ${sanitizeUrl(url)} → ${status}`;
-  if (status === 401 || status === 403) {
+  // 401 = 凭据不对；403 = 凭据认了但服务器拒绝这个操作。两者必须分开：混成
+  // 「认证失败」会把「目录已存在 / 无写权限」误导成「密码错了」。
+  if (status === 401) {
     return new SyncRemoteError('unauthorized', `Sync server authentication failed (${where})`, status);
+  }
+  if (status === 403) {
+    return new SyncRemoteError('forbidden', `Sync server refused the operation (${where})`, status);
   }
   if (status === 404) {
     return new SyncRemoteError('notFound', `Sync path not found (${where})`, status);
@@ -200,32 +206,56 @@ export class SyncRemote {
   }
 
   /**
-   * 逐级创建目录（配置目录 → sync → sync/sessions）。
+   * 逐级确保目录存在（配置目录 → sync → sync/sessions）。
    *
-   * 不用 PROPFIND 探测存在性：MKCOL 一个已存在的集合在 RFC 4918 下返回 405，
-   * 各家服务端还会返回 301 / 409，这些一律当作「已存在」忽略。真正的失败会在
-   * 随后的 PUT 上以 409 / 5xx 暴露出来。
+   * **先探测、只有不存在才创建**。不能对每一级都无条件 MKCOL：RFC 4918 说已存在的
+   * 集合返回 405，但实测不少服务端（坚果云等）返回的是 **403**，会被误判成「认证
+   * 失败」——用户明明密码正确、只读探测也通，却在同步第一步就报错。用户把同步目录
+   * 指向一个**已经存在**的文件夹（比如复用了备份目录）时必踩。
+   *
+   * 探测用 PROPFIND 但**不解析 XML**，只看状态码，所以 service worker 里也能跑。
+   * 服务端不支持 PROPFIND（403 / 405 / 501）时不算失败，交给随后的 MKCOL 定论。
    */
   async ensureDirectories(): Promise<void> {
-    const segments = [this.config.directory, SYNC_ROOT, `${SYNC_ROOT}/sessions`]
-      .flatMap((p) => p.split('/'))
-      .filter(Boolean);
-    // 去重（配置目录本身可能已经包含 sync，虽然不推荐）
-    const seen = new Set<string>();
-    const ordered: string[] = [];
-    for (const seg of segments) {
-      const key = `${ordered.join('/')}/${seg}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      ordered.push(seg);
-    }
-    let acc = this.config.url.replace(/\/+$/, '');
-    for (const seg of ordered) {
-      acc = `${acc}/${encodeURIComponent(seg)}`;
-      await request(acc, this.config, {
-        method: 'MKCOL',
-        allowStatuses: [200, 201, 204, 301, 302, 405, 409],
+    // 逐级路径：配置目录的每一层 → 其下的 sync → sync/sessions。
+    // 必须按「累积路径」构造：早先按段拼接去重时，`sync` 会被算成
+    // `<dir>/sync/sync`，多建一层无用目录。
+    const dirSegs = this.config.directory.split('/').filter(Boolean);
+    const targets: string[] = [];
+    for (let i = 1; i <= dirSegs.length; i++) targets.push(dirSegs.slice(0, i).join('/'));
+    targets.push([...dirSegs, SYNC_ROOT].join('/'));
+    targets.push([...dirSegs, SYNC_ROOT, 'sessions'].join('/'));
+    const ordered = [...new Set(targets)];
+
+    for (const path of ordered) {
+      const url = joinUrl(this.config.url, path);
+      // 探测：207 = 已存在。404 = 不存在。其余（403/405/501 等）视为「探测不可用」，
+      // 继续尝试创建，由 MKCOL 的结果给出最终判断。
+      const probe = await request(url, this.config, {
+        method: 'PROPFIND',
+        headers: { Depth: '0' },
+        allowStatuses: [207, 404, 403, 405, 501],
       });
+      if (probe.status === 207) continue;
+
+      try {
+        await request(url, this.config, {
+          method: 'MKCOL',
+          allowStatuses: [200, 201, 204, 301, 302, 405, 409],
+        });
+      } catch (err) {
+        // 兜底：个别服务端对「已存在」的集合既报 403 又让探测返回 404（缓存 / 视图
+        // 不一致）。再探一次，确认存在就继续，避免把可用的目录当成权限问题。
+        if (err instanceof SyncRemoteError && err.code === 'forbidden') {
+          const again = await request(url, this.config, {
+            method: 'PROPFIND',
+            headers: { Depth: '0' },
+            allowStatuses: [207, 404, 403, 405, 501],
+          });
+          if (again.status === 207) continue;
+        }
+        throw err;
+      }
     }
   }
 

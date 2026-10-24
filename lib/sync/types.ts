@@ -183,6 +183,7 @@ export type SyncErrorCode =
   | 'incompatible'
   | 'network'
   | 'unauthorized'
+  | 'forbidden'
   | 'server'
   | 'busy'
   | 'unknown';

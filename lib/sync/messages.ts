@@ -20,6 +20,8 @@ export function syncErrorText(code: SyncErrorCode): string {
       return t('settings.sync.error.network');
     case 'unauthorized':
       return t('settings.sync.error.unauthorized');
+    case 'forbidden':
+      return t('settings.sync.error.forbidden');
     case 'server':
       return t('settings.sync.error.server');
     case 'busy':

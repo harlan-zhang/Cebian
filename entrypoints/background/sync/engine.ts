@@ -108,6 +108,8 @@ function toErrorCode(err: unknown): SyncErrorCode {
         return 'network';
       case 'unauthorized':
         return 'unauthorized';
+      case 'forbidden':
+        return 'forbidden';
       case 'invalid':
       case 'notFound':
       case 'conflict':
