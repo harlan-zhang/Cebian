@@ -18,6 +18,7 @@
 // JSON-safe（无 Uint8Array 等需信封的二进制）。
 
 import {
+  getSession,
   getSessionMutations,
   listSessions,
   type SessionBackupRecord,
@@ -37,6 +38,8 @@ export const BACKUP_APPLY_CHUNK = 'backup:applyChunk';
 export const BACKUP_APPLY_COMMIT = 'backup:applyCommit';
 /** 恢复分块协议：放弃某 nonce 的缓冲（发送中途失败时清理，避免内存泄漏）。 */
 export const BACKUP_APPLY_ABORT = 'backup:applyAbort';
+/** 多设备同步用：按 id 批量删除会话（远端墓碑落到本机时）。 */
+export const BACKUP_DELETE_SESSIONS = 'backup:deleteSessions';
 
 interface FlushSessionsRequest {
   type: typeof BACKUP_FLUSH_SESSIONS;
@@ -64,11 +67,17 @@ interface ApplyAbortRequest {
   nonce: string;
 }
 
+interface DeleteSessionsRequest {
+  type: typeof BACKUP_DELETE_SESSIONS;
+  ids: string[];
+}
+
 type BackupRequest =
   | FlushSessionsRequest
   | ApplyChunkRequest
   | ApplyCommitRequest
-  | ApplyAbortRequest;
+  | ApplyAbortRequest
+  | DeleteSessionsRequest;
 
 /** 请求类型 → 响应负载类型的映射：把 wire 契约的请求 / 响应配对绑死，避免
  *  `send<任意类型>(任意请求)` 这种错配编译通过。只有 COMMIT 返回结果，其余是 void。 */
@@ -77,6 +86,7 @@ interface BackupResultMap {
   [BACKUP_APPLY_CHUNK]: void;
   [BACKUP_APPLY_COMMIT]: ApplySessionsResult;
   [BACKUP_APPLY_ABORT]: void;
+  [BACKUP_DELETE_SESSIONS]: number;
 }
 
 /** 恢复写入结果。 */
@@ -226,26 +236,51 @@ export function* chunkBySerializedSize<R>(
  *  （旧版本扩展仍可导入的 v1 形态），`mutations` = 可重放的一致日志前缀（新版本
  *  导入时完整保留分支；坏尾被截掉，避免恢复侧严格校验整体拒绝反而丢光分支）。
  *  迁移失败行（`treeMigrationFailed`，无日志）例外地只导出影子字段——那是它们的真相。 */
-export async function collectSessions(): Promise<SessionBackupRecord[]> {
+/** 等 background 把在途的树写落定。页面侧直读 Dexie 前调用。 */
+export async function flushSessions(): Promise<void> {
   await send({ type: BACKUP_FLUSH_SESSIONS });
+}
+
+export async function collectSessions(): Promise<SessionBackupRecord[]> {
+  await flushSessions();
   const rows = await listSessions();
-  return Promise.all(
-    rows.map(async (row): Promise<SessionBackupRecord> => {
-      if (row.treeMigrationFailed) return row;
-      const raw = (await getSessionMutations(row.id)).map((r) => r.mutation);
-      const { messages, validPrefix } = projectMutationLog(raw);
-      return {
-        ...row,
-        messages,
-        ...(validPrefix.length > 0 ? { mutations: validPrefix } : {}),
-      };
-    }),
-  );
+  return Promise.all(rows.map((row) => readSessionRecordForBackup(row.id).then((r) => r ?? row)));
+}
+
+/**
+ * 读单个会话的备份 / 同步形态（行 + mutation 日志投影）。会话不存在返回 null。
+ *
+ * 页面侧可直接调用（同源 Dexie 只读）；调用方若可能漏掉在途写，应先发
+ * `BACKUP_FLUSH_SESSIONS` 让 background 的串行链落定。
+ */
+export async function readSessionRecordForBackup(id: string): Promise<SessionBackupRecord | null> {
+  const row = await getSession(id);
+  if (!row) return null;
+  // 迁移失败行没有日志，影子字段就是它的真相
+  if (row.treeMigrationFailed) return row;
+  const raw = (await getSessionMutations(id)).map((r) => r.mutation);
+  const { messages, validPrefix } = projectMutationLog(raw);
+  return {
+    ...row,
+    messages,
+    ...(validPrefix.length > 0 ? { mutations: validPrefix } : {}),
+  };
 }
 
 /** 把会话按策略写回（background 是 Dexie 唯一写者）。按字节预算分块 CHUNK 发送、累积
  *  进 background 一个按 nonce 隔离的缓冲，再 COMMIT 一次性在单事务里写入。任一步失败
  *  best-effort 发 ABORT 丢弃半截缓冲（不掩盖原始错误）。 */
+/**
+ * 按 id 批量删除会话（多设备同步的远端删除传播用）。
+ *
+ * 必须经 background：它是 Dexie 的唯一写者，而且只有它能同时把活会话从
+ * sessionManager 里摘掉（否则下一次树写会把行重建出来）。
+ */
+export async function deleteSessions(ids: string[]): Promise<number> {
+  if (ids.length === 0) return 0;
+  return send({ type: BACKUP_DELETE_SESSIONS, ids });
+}
+
 export async function restoreSessions(
   records: SessionBackupRecord[],
   strategy: RestoreStrategy,

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import { syncConfig, syncState } from '@/lib/persistence/storage';
-import { SYNC_NOW, type SyncNowResponse } from '@/lib/sync/protocol';
+import { triggerSync } from '@/lib/sync/client';
 import { syncErrorText, syncErrorTextWithDetail, syncRelativeTime } from '@/lib/sync/messages';
 import { emptySyncState, type SyncConfig, type SyncErrorCode } from '@/lib/sync/types';
 import { cn } from '@/lib/utils';
@@ -26,7 +26,10 @@ export function SyncButton({ onOpenSettings }: { onOpenSettings: () => void }) {
   const [state] = useStorageItem(syncState, emptySyncState());
   const [busy, setBusy] = useState(false);
 
-  const configured = Boolean(config?.url?.trim() && config?.syncPassword);
+  const configured = Boolean(
+    config?.syncPassword &&
+      (config.transport === 'folder' ? config.folderName : config.url?.trim()),
+  );
 
   const handleClick = async () => {
     if (!configured || !config?.enabled) {
@@ -35,13 +38,10 @@ export function SyncButton({ onOpenSettings }: { onOpenSettings: () => void }) {
     }
     setBusy(true);
     try {
-      const resp = (await chrome.runtime.sendMessage({
-        type: SYNC_NOW,
-        reason: 'manual',
-      })) as SyncNowResponse | undefined;
-      if (!resp) toast.error(syncErrorText('noResponse'));
-      else if (resp.ok) toast.success(t('settings.sync.success'));
-      else toast.error(syncErrorTextWithDetail(resp.code ?? 'unknown', resp.detail));
+      // 自动按配置里的介质选择执行位置：WebDAV 交给后台，文件夹在当前页面跑
+      const result = await triggerSync('manual');
+      if (result.ok) toast.success(t('settings.sync.success'));
+      else toast.error(syncErrorTextWithDetail(result.code ?? 'unknown', result.detail));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : String(err));
     } finally {

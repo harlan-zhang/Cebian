@@ -13,6 +13,7 @@
 
 import { isValidSessionId } from '@/lib/utils';
 import { SYNC_ROOT } from './types';
+import type { SyncStore } from './store';
 import type { SyncKeyMeta } from './types';
 
 /** 元数据操作超时（毫秒）。 */
@@ -178,7 +179,7 @@ function mapStatus(status: number, method: string, url: string): SyncRemoteError
 /**
  * 同步仓库客户端。构造时不发请求；`ensureDirectories` 在首次写入前显式调用。
  */
-export class SyncRemote {
+export class SyncRemote implements SyncStore {
   private readonly config: SyncRemoteConfig;
 
   constructor(config: SyncRemoteConfig) {
@@ -203,6 +204,11 @@ export class SyncRemote {
       throw new SyncRemoteError('invalid', `Invalid session id for sync path: ${JSON.stringify(id)}`);
     }
     return `sessions/${id}.enc`;
+  }
+
+  /** 传输接口的实现：WebDAV 的「就绪」就是确保目录存在。 */
+  async ensureReady(): Promise<void> {
+    await this.ensureDirectories();
   }
 
   /**

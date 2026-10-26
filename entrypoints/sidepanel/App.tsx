@@ -15,7 +15,8 @@ import { useFileDropGuard } from '@/hooks/useFileDropZone';
 import { themePreference } from '@/lib/persistence/storage';
 import { chatAppearanceStyle } from '@/lib/ui/chat-appearance';
 import { sessionListChannel } from '@/lib/agent/session-list-channel';
-import { SYNC_NOW } from '@/lib/sync/protocol';
+import { triggerSync } from '@/lib/sync/client';
+import { OPEN_TRIGGER_MIN_INTERVAL_MS } from '@/lib/sync/types';
 import { t } from '@/lib/i18n';
 import { ChatPage } from './pages/chat';
 import { useSidePanelToggle } from './useSidePanelToggle';
@@ -80,11 +81,10 @@ function App() {
   // 打开侧边栏即请求一次同步。background 侧对 reason=panel 有最小间隔节流（60 秒），
   // 频繁开关面板不会反复发请求；未配置同步时后台会立刻返回 notConfigured，无副作用。
   useEffect(() => {
-    chrome.runtime
-      .sendMessage({ type: SYNC_NOW, reason: 'panel' })
-      .catch(() => {
-        // SW 尚未就绪 / 页面正在卸载：忽略，下一次触发会补上
-      });
+    // 文件夹介质只能在页面里跑，所以这个触发点对两种介质都必要。
+    void triggerSync('panel', OPEN_TRIGGER_MIN_INTERVAL_MS).catch(() => {
+      // 页面正在卸载 / 尚未就绪：忽略，下一次触发会补上
+    });
   }, []);
 
   // 文件拖放兜底：拖放区以外松开文件不让浏览器打开它；同时给内部拖动打标记（见 hook）。

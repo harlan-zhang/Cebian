@@ -21,6 +21,7 @@ import {
   BACKUP_APPLY_CHUNK,
   BACKUP_APPLY_COMMIT,
   BACKUP_APPLY_ABORT,
+  BACKUP_DELETE_SESSIONS,
   type BackupResponse,
   type ApplySessionsResult,
 } from '@/lib/backup/sources/sessions';
@@ -113,7 +114,8 @@ export function registerBackupHandler(): void {
       msg?.type === BACKUP_FLUSH_SESSIONS ||
       msg?.type === BACKUP_APPLY_CHUNK ||
       msg?.type === BACKUP_APPLY_COMMIT ||
-      msg?.type === BACKUP_APPLY_ABORT;
+      msg?.type === BACKUP_APPLY_ABORT ||
+      msg?.type === BACKUP_DELETE_SESSIONS;
     // 非 backup 消息，交给其它监听器
     if (!isBackup) return false;
 
@@ -210,6 +212,18 @@ export function registerBackupHandler(): void {
           releaseKeepAlive();
           committingNonces.delete(msg.nonce);
         }
+      }, sendResponse);
+    }
+
+    // deleteSessions：多设备同步把远端墓碑落到本机。先摘掉活会话（防止它在删除
+    // 事务之后的下一次树写把行重建出来），再单事务删库。返回实际删除条数。
+    if (msg.type === BACKUP_DELETE_SESSIONS) {
+      return respond<number>(async () => {
+        if (!Array.isArray(msg.ids) || !msg.ids.every((id: unknown) => typeof id === 'string')) {
+          throw new Error('deleteSessions: ids must be an array of strings');
+        }
+        for (const id of msg.ids) sessionManager.destroySession(id);
+        return sessionStore.deleteMany(msg.ids);
       }, sendResponse);
     }
 

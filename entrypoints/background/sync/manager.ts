@@ -31,6 +31,9 @@ async function scheduleAlarm(): Promise<void> {
   const config = await syncConfig.getValue();
   await chrome.alarms.clear(SYNC_ALARM);
   if (!config?.enabled) return;
+  // 文件夹介质只能在扩展页面里跑（service worker 没有 File System Access），
+  // 没有后台定时这回事；页面会在打开时自行触发。
+  if (config.transport === 'folder') return;
   const minutes = clampInterval(config.intervalMinutes);
   chrome.alarms.create(SYNC_ALARM, {
     delayInMinutes: minutes,

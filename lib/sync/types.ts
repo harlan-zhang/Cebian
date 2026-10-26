@@ -38,12 +38,24 @@ export const OPEN_TRIGGER_MIN_INTERVAL_MS = 60 * 1000;
 // ─── 配置与状态（本机） ───
 
 /**
+ * 同步介质：
+ * - `webdav`：走网络，可在后台定时同步；
+ * - `folder`：本地文件夹（File System Access），只能在扩展页面里跑，
+ *   适合「同一台电脑的多个浏览器配置文件」。
+ */
+export type SyncTransport = 'webdav' | 'folder';
+
+/**
  * 同步配置。整体属于「本机连接信息 + 密钥」，不进备份、不同步到远端——
  * 否则会把同步口令本身传到它自己要保护的仓库里。
  */
 export interface SyncConfig {
   /** 总开关。关闭时不调度、不自动同步；手动按钮也不可用。 */
   enabled: boolean;
+  /** 同步介质。旧配置没有这个字段时按 `webdav` 处理。 */
+  transport: SyncTransport;
+  /** 本地文件夹的显示名（仅用于 UI；真正的句柄存在 IndexedDB 里）。 */
+  folderName: string;
   /** WebDAV 端点。 */
   url: string;
   username: string;
@@ -178,9 +190,25 @@ export function emptySyncStats(): SyncStats {
   };
 }
 
+/** 触发来源。仅用于日志与「打开面板触发」的节流判断。 */
+export type SyncReason = 'manual' | 'alarm' | 'startup' | 'panel';
+
+/** 一次同步的结果。失败不抛异常——调用方（消息处理器 / alarm / 页面）需要可序列化的结果。 */
+export interface SyncRunResult {
+  ok: boolean;
+  code?: SyncErrorCode;
+  /** 失败时的原始错误摘要，供 UI 展示 / 排障（不含凭据）。 */
+  detail?: string;
+  stats?: SyncStats;
+  lastSyncAt?: number;
+}
+
 /** 同步失败的错误码（本地化文案由 UI 侧映射）。 */
 export type SyncErrorCode =
   | 'notConfigured'
+  | 'noFolder'
+  | 'needsPermission'
+  | 'unsupported'
   | 'disabled'
   | 'wrongPassword'
   | 'incompatible'
