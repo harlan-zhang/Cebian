@@ -270,6 +270,22 @@ export async function getSessionMutations(id: string): Promise<SessionMutationRo
     .toArray();
 }
 
+/**
+ * 最近一次会话写入的时间（所有会话 updatedAt 的最大值）；没有会话时为 0。
+ *
+ * 同步的「本机是否有新改动」轮询用它：只取 `updatedAt` 索引键，不把会话行
+ *（可能含大量消息）读进内存。每秒调一次也不会有明显开销。
+ */
+export async function getMaxSessionUpdatedAt(): Promise<number> {
+  const keys = await db.sessions.orderBy('updatedAt').keys();
+  let max = 0;
+  for (const key of keys) {
+    const value = Number(key);
+    if (Number.isFinite(value) && value > max) max = value;
+  }
+  return max;
+}
+
 export async function listSessions(): Promise<SessionRecord[]> {
   return db.sessions.orderBy('updatedAt').reverse().toArray();
 }

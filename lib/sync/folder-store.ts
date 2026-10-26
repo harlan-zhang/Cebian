@@ -185,6 +185,24 @@ export class FolderStore implements SyncStore {
     return { dir, name };
   }
 
+  /**
+   * 索引文件的修改时间（毫秒）；不存在返回 null。
+   *
+   * 实时同步靠它判断「别处有没有新写入」：File System Access 没有 watch API，
+   * 只能轮询。读一次文件元数据很便宜，比每几秒解密整个索引划算得多。
+   */
+  async indexMtime(): Promise<number | null> {
+    try {
+      const { dir, name } = await this.resolve(SYNC_FILES.index, false);
+      const handle = await dir.getFileHandle(name);
+      const file = await handle.getFile();
+      return file.lastModified;
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'NotFoundError') return null;
+      throw mapFsError(err, 'stat index');
+    }
+  }
+
   async readMeta(): Promise<SyncKeyMeta | null> {
     const bytes = await this.readFile(SYNC_FILES.meta);
     if (!bytes) return null;

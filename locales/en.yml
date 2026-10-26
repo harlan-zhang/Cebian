@@ -613,7 +613,7 @@ settings:
     folderGrant: "Grant access"
     folderGranted: "Folder access granted"
     folderPermissionNeeded: "The browser needs your permission again after a restart"
-    folderHint: "Pick a folder (it can live inside OneDrive or iCloud) and choose the same one in every Chrome profile on this computer. Sync runs when you open the side panel or press sync."
+    folderHint: "Pick a folder (it can live inside OneDrive or iCloud) and choose the same one in every Chrome profile on this computer. While the side panel is open, changes sync automatically within a few seconds."
     folderUnsupported: "This browser doesn't support local folder sync — use WebDAV instead"
     lastSync: "Last synced $1"
     justNow: "just now"

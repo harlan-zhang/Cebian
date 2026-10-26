@@ -608,7 +608,7 @@ settings:
     folderGrant: "授予存取權限"
     folderGranted: "已取得資料夾存取權限"
     folderPermissionNeeded: "瀏覽器重新啟動後需要再授權一次"
-    folderHint: "選一個資料夾（可以放在 OneDrive / iCloud 裡），本機每個 Chrome 設定檔都選同一個。開啟側邊欄或按下同步時執行。"
+    folderHint: "選一個資料夾（可以放在 OneDrive / iCloud 裡），本機每個 Chrome 設定檔都選同一個。側邊欄開著時，改動會在幾秒內自動同步。"
     folderUnsupported: "目前瀏覽器不支援本機資料夾同步——請改用 WebDAV"
     lastSync: "上次同步：$1"
     justNow: "剛剛"

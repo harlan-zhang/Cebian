@@ -366,7 +366,23 @@ export async function runSyncCore(deps: SyncCoreDeps): Promise<SyncRunResult> {
       updatedAt: startedAt,
       ...mergedIndex,
     };
-    await store.writeFile(SYNC_FILES.index, await encryptJson(key, nextIndex));
+
+    // **只在真有变化时才写索引**。这不是省流量的优化，而是实时同步的前提：
+    // 页面侧的监听器靠索引文件的 mtime 判断「别处有更新」，如果每次同步都无条件
+    // 重写（哪怕什么都没变），两台设备就会互相触发，形成无限同步循环。
+    const indexDirty =
+      Object.keys(pushedSessionMeta).length > 0 ||
+      stats.pushedSettings > 0 ||
+      stats.pushedCredentials > 0 ||
+      Object.keys(sessionPlan.tombstone).length > 0 ||
+      sessionPlan.pruneTombstones.length > 0 ||
+      !remoteIndex.devices[deviceId];
+
+    if (indexDirty) {
+      await store.writeFile(SYNC_FILES.index, await encryptJson(key, nextIndex));
+    } else {
+      log('[sync] index unchanged, skipping write');
+    }
 
     // 索引已落盘，再删远端文件（先删会让别的设备读到悬空条目）
     for (const id of Object.keys(sessionPlan.tombstone)) {

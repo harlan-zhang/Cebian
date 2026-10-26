@@ -191,7 +191,7 @@ export function emptySyncStats(): SyncStats {
 }
 
 /** 触发来源。仅用于日志与「打开面板触发」的节流判断。 */
-export type SyncReason = 'manual' | 'alarm' | 'startup' | 'panel';
+export type SyncReason = 'manual' | 'alarm' | 'startup' | 'panel' | 'auto';
 
 /** 一次同步的结果。失败不抛异常——调用方（消息处理器 / alarm / 页面）需要可序列化的结果。 */
 export interface SyncRunResult {

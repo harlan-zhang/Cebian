@@ -16,6 +16,7 @@ import { themePreference } from '@/lib/persistence/storage';
 import { chatAppearanceStyle } from '@/lib/ui/chat-appearance';
 import { sessionListChannel } from '@/lib/agent/session-list-channel';
 import { triggerSync } from '@/lib/sync/client';
+import { startSyncWatcher, stopSyncWatcher } from '@/lib/sync/watcher';
 import { OPEN_TRIGGER_MIN_INTERVAL_MS } from '@/lib/sync/types';
 import { t } from '@/lib/i18n';
 import { ChatPage } from './pages/chat';
@@ -85,6 +86,19 @@ function App() {
     void triggerSync('panel', OPEN_TRIGGER_MIN_INTERVAL_MS).catch(() => {
       // 页面正在卸载 / 尚未就绪：忽略，下一次触发会补上
     });
+  }, []);
+
+  // 本地文件夹介质的准实时同步：面板开着时轮询索引与本地改动。
+  // WebDAV 下这个 watcher 会自己判定不适用并立即返回。
+  useEffect(() => {
+    let stop: (() => void) | null = null;
+    void startSyncWatcher().then((fn) => {
+      stop = fn;
+    });
+    return () => {
+      stop?.();
+      stopSyncWatcher();
+    };
   }, []);
 
   // 文件拖放兜底：拖放区以外松开文件不让浏览器打开它；同时给内部拖动打标记（见 hook）。

@@ -608,7 +608,7 @@ settings:
     folderGrant: "授予访问权限"
     folderGranted: "已获得文件夹访问权限"
     folderPermissionNeeded: "浏览器重启后需要再授权一次"
-    folderHint: "选一个文件夹（可以放在 OneDrive / iCloud 里），本机每个 Chrome 配置文件都选同一个。打开侧边栏或点同步时执行。"
+    folderHint: "选一个文件夹（可以放在 OneDrive / iCloud 里），本机每个 Chrome 配置文件都选同一个。侧边栏开着时，改动会在几秒内自动同步。"
     folderUnsupported: "当前浏览器不支持本地文件夹同步——请改用 WebDAV"
     lastSync: "上次同步：$1"
     justNow: "刚刚"
