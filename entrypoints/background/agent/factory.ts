@@ -243,6 +243,11 @@ function createCebianAgent(options: CreateAgentOptions): Agent {
     getApiKey: (provider: string): Promise<string | undefined> =>
       resolveProviderApiKey(provider),
 
+    // pi-agent-core 1.4 起 loop 默认带 pi 自己的归因（OpenRouter 的 `X-OpenRouter-Title: pi`、
+    // NVIDIA 的 `X-BILLING-INVOKE-ORIGIN: Pi` 等）。这里关掉，与压缩、划词这类直接调
+    // pi-ai 的请求保持一致；OpenRouter 的 Cebian 归因仍由 resolve-model 写进 model.headers。
+    identity: { attribution: null },
+
     // 工具执行前授权门禁（可选）。permissionRequest 自定义消息无需在
     // convertToLlm 里特判——上面的角色白名单已把它连同其它自定义类型一并过滤，
     // 不会发给 provider。
