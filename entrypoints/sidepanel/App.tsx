@@ -12,6 +12,7 @@ import { useStorageItem } from '@/hooks/useStorageItem';
 import { useChangelogOnUpdate } from '@/hooks/useChangelogOnUpdate';
 import { useChatAppearance } from '@/hooks/useChatAppearance';
 import { useFileDropGuard } from '@/hooks/useFileDropZone';
+import { useFolderPermissionPrompt } from '@/hooks/useFolderPermissionPrompt';
 import { themePreference } from '@/lib/persistence/storage';
 import { chatAppearanceStyle } from '@/lib/ui/chat-appearance';
 import { sessionListChannel } from '@/lib/agent/session-list-channel';
@@ -103,6 +104,9 @@ function App() {
 
   // 文件拖放兜底：拖放区以外松开文件不让浏览器打开它；同时给内部拖动打标记（见 hook）。
   useFileDropGuard();
+
+  // 文件夹介质：权限只对本次会话有效时，把用户的第一次点击变成授权时机。
+  useFolderPermissionPrompt();
 
   // Load theme from storage before first render
   useEffect(() => {

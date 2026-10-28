@@ -143,6 +143,31 @@ export async function requestFolderPermission(
   return request.call(handle, { mode: 'readwrite' });
 }
 
+/** 当前是否处在用户手势的有效期内（只有这时才能弹权限框）。 */
+export function hasUserActivation(): boolean {
+  const activation = (navigator as Navigator & { userActivation?: { isActive: boolean } }).userActivation;
+  return activation?.isActive ?? false;
+}
+
+/**
+ * 在用户手势里尝试把「本次会话」的授权升级成持久授权。
+ *
+ * 为什么必须主动调 `requestPermission()`：Chrome 122 起支持文件句柄的永久权限，
+ * 但**只有在后续访问中主动请求**时才会弹出「仅允许这次 / 每次访问时允许 / 不允许」
+ * 三选一。只调 `queryPermission()` 的话永远停在「仅本次会话」，面板一关就失效——
+ * 这正是「每次打开都要重新授权」的原因。
+ *
+ * 没有用户手势时返回当前状态，不弹框（浏览器不允许）。
+ */
+export async function upgradeFolderPermission(
+  handle: FileSystemDirectoryHandle,
+): Promise<'granted' | 'prompt' | 'denied'> {
+  const current = await folderPermission(handle);
+  if (current === 'granted') return current;
+  if (!hasUserActivation()) return current;
+  return requestFolderPermission(handle);
+}
+
 // ─── 仓库读写 ───
 
 /** 把 DOMException 翻成可读的文件夹错误。 */

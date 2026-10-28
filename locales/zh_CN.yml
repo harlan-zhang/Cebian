@@ -607,7 +607,7 @@ settings:
     folderChange: "更换…"
     folderGrant: "授予访问权限"
     folderGranted: "已获得文件夹访问权限"
-    folderPermissionNeeded: "浏览器重启后需要再授权一次"
+    folderPermissionNeeded: "在弹窗里选「每次访问时允许」，Chrome 就不会再问"
     folderHint: "选一个文件夹（可以放在 OneDrive / iCloud 里），本机每个 Chrome 配置文件都选同一个。侧边栏开着时，改动会在几秒内自动同步。"
     folderUnsupported: "当前浏览器不支持本地文件夹同步——请改用 WebDAV"
     lastSync: "上次同步：$1"
@@ -639,7 +639,7 @@ settings:
       busy: "已有同步正在进行"
       unknown: "同步失败"
       noFolder: "尚未选择同步文件夹——请先选一个"
-      needsPermission: "文件夹授权已失效——请在「设置 → 数据」里重新授权"
+      needsPermission: "文件夹授权已失效——点一下面板任意位置，在弹出的窗口里选「每次访问时允许」"
       unsupported: "当前浏览器不支持文件夹同步"
       noResponse: "同步没有完成——后台没有响应。请再试一次；若反复出现，请查看扩展的后台日志"
 

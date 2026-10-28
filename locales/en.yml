@@ -612,7 +612,7 @@ settings:
     folderChange: "Change…"
     folderGrant: "Grant access"
     folderGranted: "Folder access granted"
-    folderPermissionNeeded: "The browser needs your permission again after a restart"
+    folderPermissionNeeded: "Choose “Allow on every visit” in the prompt so Chrome stops asking"
     folderHint: "Pick a folder (it can live inside OneDrive or iCloud) and choose the same one in every Chrome profile on this computer. While the side panel is open, changes sync automatically within a few seconds."
     folderUnsupported: "This browser doesn't support local folder sync — use WebDAV instead"
     lastSync: "Last synced $1"
@@ -644,7 +644,7 @@ settings:
       busy: "A sync is already running"
       unknown: "Sync failed"
       noFolder: "No sync folder selected — choose one first"
-      needsPermission: "Folder access expired — grant access again in Settings → Data"
+      needsPermission: "Folder access expired — click anywhere in the panel and choose “Allow on every visit”"
       unsupported: "This browser doesn't support folder sync"
       noResponse: "Sync didn't finish — the background worker didn't respond. Try again; if it keeps happening, check the extension's service worker console"
 

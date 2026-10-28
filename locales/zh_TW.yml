@@ -607,7 +607,7 @@ settings:
     folderChange: "更換…"
     folderGrant: "授予存取權限"
     folderGranted: "已取得資料夾存取權限"
-    folderPermissionNeeded: "瀏覽器重新啟動後需要再授權一次"
+    folderPermissionNeeded: "在彈窗裡選「每次造訪時允許」，Chrome 就不會再問"
     folderHint: "選一個資料夾（可以放在 OneDrive / iCloud 裡），本機每個 Chrome 設定檔都選同一個。側邊欄開著時，改動會在幾秒內自動同步。"
     folderUnsupported: "目前瀏覽器不支援本機資料夾同步——請改用 WebDAV"
     lastSync: "上次同步：$1"
@@ -639,7 +639,7 @@ settings:
       busy: "已有同步正在進行"
       unknown: "同步失敗"
       noFolder: "尚未選擇同步資料夾——請先選一個"
-      needsPermission: "資料夾授權已失效——請在「設定 → 資料」裡重新授權"
+      needsPermission: "資料夾授權已失效——點一下面板任意位置，在彈出的視窗裡選「每次造訪時允許」"
       unsupported: "目前瀏覽器不支援資料夾同步"
       noResponse: "同步沒有完成——背景沒有回應。請再試一次；若反覆出現，請查看擴充功能的主控台"
 

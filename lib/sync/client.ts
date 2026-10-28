@@ -19,7 +19,7 @@ import {
 } from '@/lib/backup/sources/sessions';
 import { syncConfig, syncState } from '@/lib/persistence/storage';
 import { errorDetail, runSyncCore, type SyncLocalAdapter } from './engine-core';
-import { FolderStore, loadFolderHandle } from './folder-store';
+import { FolderStore, loadFolderHandle, upgradeFolderPermission } from './folder-store';
 import { createStorageAdapter } from './local-storage-adapter';
 import { SYNC_NOW, type SyncNowResponse } from './protocol';
 import type { SyncReason, SyncRunResult } from './types';
@@ -84,6 +84,9 @@ export async function triggerSync(reason: SyncReason, minIntervalMs = 0): Promis
   inFlight = (async (): Promise<SyncRunResult> => {
     const handle = await loadFolderHandle();
     if (!handle) return { ok: false, code: 'noFolder' };
+    // 有用户手势时顺手把「仅本次会话」升级成「每次访问都允许」——否则每次打开面板
+    // 都要重新授权。没有手势时这一步什么都不做，不会弹框。
+    await upgradeFolderPermission(handle);
     const store = new FolderStore(handle);
     return runSyncCore({
       config,
